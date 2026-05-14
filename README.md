@@ -31,8 +31,6 @@ ejemplo NO: C:\Users\catru\OneDrive\Escritorio\NeoRX\src
 
 --------------------FUNCINAMIENTO DE LAS CARPETAS--------------------------------------------------------
 Cada archivo explica que hace.
---- En data se encuentran los datos. RAW = los que nos mandó el médico. PROCESSED = los ingresados o data aprendida. 
---- en scr (source) está todo el código para el funcionamiento del software. Cada archivo explica que hace, por favor mantener su funcionamiento y no mezclar funciones. Es preferible crear más archivos que tener uno que haga funciones demaisado distintas. 
 
 
 
