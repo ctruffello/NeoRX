@@ -1,88 +1,132 @@
-###### EXPLICACIÓN CÓDIGO
-### Primero mencionar que el software está trabajndo sólo con la base de datos del antibiograma en la página UC
-### En la columna I "deteccion final" se ve que muchos inputs tienen demasiados typos y nombres diferentes para la misma bacteria. asumo que lo único que importa es el nombre de la bacteria y normalizo los nombres en el sig código
-### Lo que hace entonces el código es que primero normaliza el nombre de bacteria inical (aunque esté mal escrita). 
-### Luego, asocia lo anotado a un diccionario que tiene todos los typos frecunetes. Entonces lo busca en el diccionario y arroja de diccionario la bacteria bien escrita.
+from rapidfuzz import fuzz
+import unicodedata
+import re
+
+# =========================================
+# 1. LIMPIEZA ULTRA ROBUSTA
+# =========================================
+def limpiar_texto(texto):
+    if not isinstance(texto, str) or texto.strip() == "":
+        return ""
+
+    texto = texto.lower()
+
+    # quitar tildes
+    texto = unicodedata.normalize('NFD', texto)
+    texto = ''.join(c for c in texto if unicodedata.category(c) != 'Mn')
+
+    # reemplazar símbolos comunes
+    texto = texto.replace(".", " ")
+    texto = texto.replace(",", " ")
+    texto = texto.replace("-", " ")
+
+    # eliminar caracteres raros
+    texto = re.sub(r'[^a-z0-9\s/]', ' ', texto)
+
+    # limpiar espacios
+    texto = " ".join(texto.split())
+
+    return texto
 
 
+# =========================================
+# 2. LISTAS MAESTRAS
+# =========================================
+BACTERIAS_VALIDAS = [
+    "Escherichia coli",
+    "Staphylococcus aureus",
+    "Pseudomonas aeruginosa",
+    "Klebsiella pneumoniae",
+    "Enterococcus faecalis",
+    "Proteus mirabilis",
+    "Enterobacter cloacae",
+    "Klebsiella oxytoca"
+]
+
+ANTIBIOTICOS_VALIDOS = [
+    "Amikacina",
+    "Gentamicina",
+    "Clindamicina",
+    "Ceftriaxona",
+    "Ampicilina/Sulbactam",
+    "Amoxicilina/Acido clavulanico",
+    "Ciprofloxacino",
+    "Meropenem",
+    "Vancomicina"
+]
 
 
-###### ARREGLAR MAYUS, ESPACIOS 
-"""
-Original: '   esChErichia     coli  '
-Limpio:   'Escherichia coli'
-"""
-def limpiar_mayus_spc(texto):
-    # 1. validar que sea string
-    if not isinstance(texto, str):
+# =========================================
+# 3. PREPARACIÓN
+# =========================================
+def preparar_lista(lista):
+    return [(item, limpiar_texto(item)) for item in lista]
+
+
+BACTERIAS_PREP = preparar_lista(BACTERIAS_VALIDAS)
+ANTIBIOTICOS_PREP = preparar_lista(ANTIBIOTICOS_VALIDOS)
+
+
+# =========================================
+# 4. EXPANSIÓN AUTOMÁTICA DE ABREVIATURAS
+# =========================================
+def expandir_abreviatura(texto):
+    palabras = texto.split()
+
+    # caso típico: "e coli", "s aureus"
+    if len(palabras) == 2:
+        inicial, resto = palabras
+
+        if len(inicial) == 1:
+            for _, limpio_ref in BACTERIAS_PREP:
+                ref_words = limpio_ref.split()
+
+                if len(ref_words) >= 2:
+                    if ref_words[0].startswith(inicial) and ref_words[1] == resto:
+                        return limpio_ref
+
+    return texto
+
+
+# =========================================
+# 5. MOTOR AUTOMÁTICO
+# =========================================
+def normalizar_automatico(texto_sucio, lista_preparada):
+    if not isinstance(texto_sucio, str) or texto_sucio.strip() == "":
         return "Desconocido"
 
-    # 2. todo a minúsculas
-    texto_minusculas = texto.lower()
+    limpio = limpiar_texto(texto_sucio)
 
-    # 3. elimina spc inicio, final, dobles
-    texto_sin_espacios = " ".join(texto_minusculas.split())
+    # 🔥 clave: expandir abreviatura antes del matching
+    limpio = expandir_abreviatura(limpio)
 
-    # 4. solo priemra letra en mayus
-    texto_normalizado = texto_sin_espacios.capitalize()
+    mejor_match = None
+    mejor_score = 0
 
+    for original, limpio_ref in lista_preparada:
 
-    return texto_normalizado
+        score = max(
+            fuzz.ratio(limpio, limpio_ref),
+            fuzz.partial_ratio(limpio, limpio_ref),
+            fuzz.token_sort_ratio(limpio, limpio_ref)
+        )
 
+        if score > mejor_score:
+            mejor_score = score
+            mejor_match = original
 
+    if mejor_score >= 80:
+        return mejor_match
 
-###### DICCIONARIO ANTIBIÓTICOS
-diccionario_bacterias = {
-    # Keys (errores) : Values (nombre oficial)
-    # Cabe notar que están los errores en minúscila porque antes se traduce todo a minúsculas
-
-    ###### Escherichia coli
-    "e. coli": "Escherichia coli",
-    "e coli": "Escherichia coli",
-    "ecoli": "Escherichia coli",
-    "eschericia coli": "Escherichia coli", 
-
-    ###### Staphylococcus aureus
-    "s. aureus": "Staphylococcus aureus",
-    "staph aureus": "Staphylococcus aureus",
-
-    ###### Pseudomonas aeruginosa
-    "p. aeruginosa": "Pseudomonas aeruginosa",
-    "pseudomona": "Pseudomonas aeruginosa",
-
-    ###### Klebsiella pneumoniae
-    "k. pneumoniae": "Klebsiella pneumoniae",
-    "klebsiella p.": "Klebsiella pneumoniae",
-
-    ###### NULL
-    "Negativo a las 24 HRS de observación": "Null"
-}
+    return "Desconocido"
 
 
-###### DICCIONARIO ANTIBIÓTICOS
-diccionario_antibioticos = {
-    ###### Amikacina
-    "amk": "Amikacina",
-    "amikacina": "Amikacina",
-    "ampicilina sulbactam": "Ampicilina/Sulbactam", # Normalizar el separador
-    "amoxicilina/ac.clavulanico": "Amoxicilina/Ácido Clavulánico",
-    "clinda": "Clindamicina",
-    "genta": "Gentamicina",
-}
-
-
-###### FUNCIONES PARA USO
+# =========================================
+# 6. FUNCIONES FINALES
+# =========================================
 def normalizar_bacteria(texto):
-    limpio = limpiar_mayus_spc(texto)
-        resultado = diccionario_bacterias.get(limpio.lower())
-        if resultado:
-            return resultado
-        # Si no está en el diccionario, avisa para que puedas agregarlo después
-        print(f"DEBUG: Nueva variante encontrada: {limpio}")
-        return limpio
+    return normalizar_automatico(texto, BACTERIAS_PREP)
 
 
 def normalizar_antibiotico(texto):
-    limpio = limpiar_mayus_spc(texto)
-    # Busca en el diccionario
-    return diccionario_antibioticos.get(limpio.lower(), limpio)
+    return normalizar_automatico(texto, ANTIBIOTICOS_PREP)
