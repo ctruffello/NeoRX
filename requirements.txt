@@ -1,6 +1,5 @@
-// Acá ponemos las librerías
-
-
 pandas
 openpyxl
-numpycd 
+numpy
+rapidfuzz
+flask

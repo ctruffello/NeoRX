@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeoRX — Ranking de Antibióticos</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --azul:     #1a4a6e;
+            --teal:     #2e9e8e;
+            --verde:    #27ae60;
+            --naranja:  #e67e22;
+            --fondo:    #f0f4f8;
+            --card:     #ffffff;
+            --texto:    #2d3748;
+            --gris:     #718096;
+            --borde:    #e2e8f0;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--fondo);
+            color: var(--texto);
+            min-height: 100vh;
+        }
+
+        /* ── Header ─────────────────────────────── */
+        header {
+            background: var(--azul);
+            color: white;
+            padding: 1rem 2rem;
+        }
+        header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: 1px; }
+        header p  { font-size: 0.8rem; opacity: 0.65; margin-top: 0.15rem; }
+
+        /* ── Layout ─────────────────────────────── */
+        main { max-width: 1150px; margin: 0 auto; padding: 1.5rem 2rem; }
+
+        /* ── Panel de filtros ────────────────────── */
+        .filtros {
+            background: var(--card);
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            gap: 1rem;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+            margin-bottom: 1.25rem;
+        }
+
+        .campo {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+            flex: 1;
+            min-width: 160px;
+        }
+        .campo label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--gris);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        select, input[type="number"] {
+            padding: 0.5rem 0.7rem;
+            border: 1.5px solid var(--borde);
+            border-radius: 6px;
+            font-size: 0.88rem;
+            color: var(--texto);
+            background: white;
+            outline: none;
+            transition: border-color 0.2s;
+            width: 100%;
+        }
+        select:focus, input[type="number"]:focus { border-color: var(--teal); }
+
+        .anios-wrap { display: flex; gap: 0.4rem; align-items: center; }
+        .anios-wrap input { width: 80px; }
+        .anios-wrap span  { color: var(--gris); font-size: 0.85rem; }
+
+        button#btn-consultar {
+            padding: 0.55rem 1.4rem;
+            background: var(--teal);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.2s, opacity 0.2s;
+        }
+        button#btn-consultar:hover    { background: #258c7d; }
+        button#btn-consultar:disabled { opacity: 0.55; cursor: not-allowed; }
+
+        /* ── Umbral ──────────────────────────────── */
+        #umbral {
+            background: #ebf8ff;
+            border-left: 4px solid var(--teal);
+            border-radius: 6px;
+            padding: 0.65rem 1rem;
+            font-size: 0.85rem;
+            color: #2c5282;
+            margin-bottom: 1.25rem;
+            display: none;
+        }
+
+        /* ── Resultados ──────────────────────────── */
+        .resultados {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.25rem;
+        }
+        @media (max-width: 780px) { .resultados { grid-template-columns: 1fr; } }
+
+        .card {
+            background: var(--card);
+            border-radius: 10px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+        }
+        .card h2 {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--gris);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 1rem;
+        }
+
+        /* ── Leyenda de colores ───────────────────── */
+        .leyenda {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.78rem;
+            color: var(--gris);
+        }
+        .leyenda span { display: flex; align-items: center; gap: 0.35rem; }
+        .dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .dot-verde   { background: rgba(39,174,96,0.85); }
+        .dot-naranja { background: rgba(230,126,34,0.8); }
+
+        /* ── Tabla ───────────────────────────────── */
+        .tabla-scroll { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+        th {
+            text-align: left;
+            padding: 0.45rem 0.6rem;
+            color: var(--gris);
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 2px solid var(--borde);
+            white-space: nowrap;
+        }
+        td { padding: 0.45rem 0.6rem; border-bottom: 1px solid #f0f4f8; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td      { background: #f7fafc; }
+        td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+        .badge {
+            display: inline-block;
+            padding: 0.12rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.72rem;
+            font-weight: 700;
+        }
+        .badge-alta { background: #c6f6d5; color: #276749; }
+        .badge-baja { background: #feebc8; color: #7b341e; }
+
+        /* Barra de susceptibilidad inline en la tabla */
+        .barra-wrap { display: flex; align-items: center; gap: 0.5rem; }
+        .barra-fondo {
+            flex: 1;
+            height: 6px;
+            background: var(--borde);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .barra-fill {
+            height: 100%;
+            border-radius: 3px;
+        }
+
+        /* ── Estado vacío / error ────────────────── */
+        .estado {
+            text-align: center;
+            padding: 2.5rem 1rem;
+            color: var(--gris);
+            font-size: 0.9rem;
+        }
+        .estado-error { color: #c53030; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>NeoRX</h1>
+    <p>Ranking de antibióticos por susceptibilidad · Laboratorio UC</p>
+</header>
+
+<main>
+
+    <!-- Filtros -->
+    <div class="filtros">
+        <div class="campo">
+            <label>Bacteria</label>
+            <select id="sel-bacteria"><option>Cargando…</option></select>
+        </div>
+        <div class="campo">
+            <label>Tipo de muestra</label>
+            <select id="sel-tipo"><option>Cargando…</option></select>
+        </div>
+        <div class="campo">
+            <label>Rango de años</label>
+            <div class="anios-wrap">
+                <input type="number" id="anio-min" placeholder="Desde">
+                <span>–</span>
+                <input type="number" id="anio-max" placeholder="Hasta">
+            </div>
+        </div>
+        <button id="btn-consultar" onclick="consultar()">Consultar</button>
+    </div>
+
+    <!-- Umbral clínico -->
+    <div id="umbral"></div>
+
+    <!-- Resultados -->
+    <div class="resultados">
+
+        <!-- Gráfico -->
+        <div class="card">
+            <h2>Susceptibilidad %</h2>
+            <div class="leyenda">
+                <span><i class="dot dot-verde"></i> Fiabilidad alta (≥30 casos)</span>
+                <span><i class="dot dot-naranja"></i> Fiabilidad baja</span>
+            </div>
+            <div id="grafico-wrap">
+                <div class="estado">Selecciona los filtros y presiona Consultar.</div>
+            </div>
+        </div>
+
+        <!-- Tabla -->
+        <div class="card">
+            <h2>Tabla de ranking</h2>
+            <div id="tabla-wrap">
+                <div class="estado">Selecciona los filtros y presiona Consultar.</div>
+            </div>
+        </div>
+
+    </div>
+</main>
+
+<script>
+const API = '';   // vacío = mismo origen (Flask sirve el HTML)
+let graficoCurrent = null;
+
+// ── Inicialización ─────────────────────────────────────────────
+async function inicializar() {
+    try {
+        const [bacterias, tipos, anios] = await Promise.all([
+            fetch(`${API}/bacterias`).then(r => r.json()),
+            fetch(`${API}/tipos-muestra`).then(r => r.json()),
+            fetch(`${API}/anios`).then(r => r.json()),
+        ]);
+
+        const selB = document.getElementById('sel-bacteria');
+        selB.innerHTML = bacterias.map(b => `<option value="${b}">${b}</option>`).join('');
+
+        const selT = document.getElementById('sel-tipo');
+        selT.innerHTML = tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+
+        document.getElementById('anio-min').value = anios.anio_min;
+        document.getElementById('anio-max').value = anios.anio_max;
+
+    } catch {
+        document.getElementById('tabla-wrap').innerHTML =
+            '<div class="estado estado-error">No se pudo conectar con la API. ¿Está corriendo el servidor?</div>';
+    }
+}
+
+// ── Consulta ───────────────────────────────────────────────────
+async function consultar() {
+    const bacteria    = document.getElementById('sel-bacteria').value;
+    const tipoMuestra = document.getElementById('sel-tipo').value;
+    const anioMin     = document.getElementById('anio-min').value;
+    const anioMax     = document.getElementById('anio-max').value;
+
+    const btn = document.getElementById('btn-consultar');
+    btn.disabled    = true;
+    btn.textContent = 'Consultando…';
+
+    const params = new URLSearchParams({ bacteria, tipo_muestra: tipoMuestra, anio_min: anioMin, anio_max: anioMax });
+
+    try {
+        const resp = await fetch(`${API}/ranking?${params}`);
+        const data = await resp.json();
+
+        if (!resp.ok) { mostrarError(data.error); return; }
+
+        mostrarUmbral(data.umbral);
+        mostrarTabla(data.ranking);
+        mostrarGrafico(data.ranking);
+
+    } catch {
+        mostrarError('Error de red. ¿Está corriendo el servidor Flask?');
+    } finally {
+        btn.disabled    = false;
+        btn.textContent = 'Consultar';
+    }
+}
+
+// ── Umbral ─────────────────────────────────────────────────────
+function mostrarUmbral(texto) {
+    const el = document.getElementById('umbral');
+    el.textContent  = `⚕ Umbral clínico: ${texto}`;
+    el.style.display = 'block';
+}
+
+// ── Tabla ──────────────────────────────────────────────────────
+function mostrarTabla(ranking) {
+    const wrap = document.getElementById('tabla-wrap');
+    if (!ranking.length) {
+        wrap.innerHTML = '<div class="estado">Sin datos para estos filtros.</div>';
+        return;
+    }
+
+    const colorBarra = r => r.fiabilidad === 'ALTA'
+        ? 'rgba(39,174,96,0.75)'
+        : 'rgba(230,126,34,0.7)';
+
+    const filas = ranking.map((r, i) => `
+        <tr>
+            <td>${i + 1}</td>
+            <td><strong>${r.antibiotico}</strong></td>
+            <td class="num">
+                <div class="barra-wrap">
+                    <span>${r['susceptibilidad_%']}%</span>
+                    <div class="barra-fondo">
+                        <div class="barra-fill" style="width:${r['susceptibilidad_%']}%; background:${colorBarra(r)}"></div>
+                    </div>
+                </div>
+            </td>
+            <td class="num">${r.total_casos}</td>
+            <td><span class="badge badge-${r.fiabilidad.toLowerCase()}">${r.fiabilidad}</span></td>
+        </tr>
+    `).join('');
+
+    wrap.innerHTML = `
+        <div class="tabla-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Antibiótico</th>
+                        <th>Susceptibilidad</th>
+                        <th>Casos</th>
+                        <th>Fiabilidad</th>
+                    </tr>
+                </thead>
+                <tbody>${filas}</tbody>
+            </table>
+        </div>
+    `;
+}
+
+// ── Gráfico ────────────────────────────────────────────────────
+function mostrarGrafico(ranking) {
+    const wrap = document.getElementById('grafico-wrap');
+
+    // Altura dinámica según cantidad de antibióticos
+    const altura = Math.max(300, ranking.length * 28);
+    wrap.innerHTML = `<canvas id="grafico" height="${altura}"></canvas>`;
+
+    const datos   = [...ranking].reverse();
+    const labels  = datos.map(r => r.antibiotico);
+    const valores  = datos.map(r => r['susceptibilidad_%']);
+    const colores  = datos.map(r =>
+        r.fiabilidad === 'ALTA' ? 'rgba(39,174,96,0.82)' : 'rgba(230,126,34,0.75)'
+    );
+
+    if (graficoCurrent) graficoCurrent.destroy();
+
+    const ctx = document.getElementById('grafico').getContext('2d');
+    graficoCurrent = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                data: valores,
+                backgroundColor: colores,
+                borderRadius: 3,
+                borderSkipped: false,
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            const item = ranking.find(r => r.antibiotico === ctx.label);
+                            return ` ${ctx.parsed.x}%  ·  ${item?.total_casos ?? '?'} casos`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    min: 0, max: 100,
+                    ticks: { callback: v => v + '%', font: { size: 11 } },
+                    grid: { color: '#f0f4f8' }
+                },
+                y: {
+                    ticks: { font: { size: 11 } },
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+}
+
+// ── Error ──────────────────────────────────────────────────────
+function mostrarError(msg) {
+    document.getElementById('tabla-wrap').innerHTML =
+        `<div class="estado estado-error">${msg}</div>`;
+    document.getElementById('grafico-wrap').innerHTML =
+        `<div class="estado estado-error"></div>`;
+    document.getElementById('umbral').style.display = 'none';
+    if (graficoCurrent) { graficoCurrent.destroy(); graficoCurrent = null; }
+}
+
+inicializar();
+</script>
+
+</body>
+</html>
