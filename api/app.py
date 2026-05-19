@@ -19,10 +19,12 @@ Ejemplo:
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, jsonify, request, send_from_directory
 from src.ranking import generar_ranking, listar_bacterias, listar_tipos_muestra, rango_anios
+from src.alertas import detectar_alertas_epidemiologicas
 
 FRONTEND = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
 
@@ -101,6 +103,24 @@ def endpoint_ranking():
         "ranking":      filas,
     })
 
+@app.route('/alertas', methods=['GET'])
+def api_alertas():
+    # 1. Atrapamos los filtros que vienen desde la web
+    bacteria = request.args.get('bacteria')
+    tipo_muestra = request.args.get('tipo_muestra')
+    anio_max = request.args.get('anio_max')
+
+    # 2. Se los pasamos a nuestro motor matemático
+    df_alertas = detectar_alertas_epidemiologicas(
+        bacteria_filtro=bacteria,
+        tipo_filtro=tipo_muestra,
+        anio_max=anio_max
+    )
+    
+    if df_alertas is None or df_alertas.empty:
+        return jsonify([])
+    
+    return jsonify(df_alertas.to_dict(orient='records'))
 
 if __name__ == "__main__":
     print("NeoRX API corriendo en http://localhost:8000")

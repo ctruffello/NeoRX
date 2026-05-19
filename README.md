@@ -167,6 +167,7 @@ Las filas del Excel que no pueden procesarse se guardan en `data/no_validos.xlsx
 - [x] Cálculo de ranking
 - [x] API REST
 - [x] Frontend web con gráfico y tabla
+- 
 - [ ] Publicación online (pendiente)
 - [ ] Soporte para múltiples clínicas simultáneas (diseño preparado)
 

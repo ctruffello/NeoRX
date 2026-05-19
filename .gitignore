@@ -1,0 +1,8 @@
+
+__pycache__/
+*.pyc
+~$*.xlsx
+.env
+.venv/
+.vscode/
+neorx.db

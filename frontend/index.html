@@ -32,12 +32,40 @@
             background: var(--azul);
             color: white;
             padding: 1rem 2rem;
+            position: relative;
+            z-index: 10;
         }
         header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: 1px; }
         header p  { font-size: 0.8rem; opacity: 0.65; margin-top: 0.15rem; }
 
-        /* ── Layout ─────────────────────────────── */
-        main { max-width: 1150px; margin: 0 auto; padding: 1.5rem 2rem; }
+        /* ── Layout Master ──────────────────────── */
+        main { 
+            max-width: 1400px; 
+            margin: 0 auto; 
+            padding: 1.5rem 2rem; 
+        }
+        
+        .layout-master {
+            display: flex;
+            gap: 2rem; 
+            align-items: flex-start;
+        }
+        .col-principal {
+            flex: 1; 
+            min-width: 0; 
+        }
+        
+        .col-alertas {
+            width: 320px; 
+            flex-shrink: 0;
+            position: sticky;
+            top: 1.5rem;
+        }
+
+        @media (max-width: 1050px) {
+            .layout-master { flex-direction: column; }
+            .col-alertas { width: 100%; position: static; order: -1; margin-bottom: 0.5rem; }
+        }
 
         /* ── Panel de filtros ────────────────────── */
         .filtros {
@@ -57,7 +85,7 @@
             flex-direction: column;
             gap: 0.3rem;
             flex: 1;
-            min-width: 160px;
+            min-width: 140px;
         }
         .campo label {
             font-size: 0.7rem;
@@ -113,10 +141,13 @@
         /* ── Resultados ──────────────────────────── */
         .resultados {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.25rem;
+            grid-template-columns: 1fr; 
+            gap: 1.5rem;
         }
-        @media (max-width: 780px) { .resultados { grid-template-columns: 1fr; } }
+
+        @media (min-width: 1400px) { 
+            .resultados { grid-template-columns: 1fr 1fr; } 
+        }
 
         .card {
             background: var(--card);
@@ -133,7 +164,6 @@
             margin-bottom: 1rem;
         }
 
-        /* ── Leyenda de colores ───────────────────── */
         .leyenda {
             display: flex;
             gap: 1rem;
@@ -150,7 +180,6 @@
         .dot-verde   { background: rgba(39,174,96,0.85); }
         .dot-naranja { background: rgba(230,126,34,0.8); }
 
-        /* ── Tabla ───────────────────────────────── */
         .tabla-scroll { overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
         th {
@@ -179,7 +208,6 @@
         .badge-alta { background: #c6f6d5; color: #276749; }
         .badge-baja { background: #feebc8; color: #7b341e; }
 
-        /* Barra de susceptibilidad inline en la tabla */
         .barra-wrap { display: flex; align-items: center; gap: 0.5rem; }
         .barra-fondo {
             flex: 1;
@@ -193,7 +221,6 @@
             border-radius: 3px;
         }
 
-        /* ── Estado vacío / error ────────────────── */
         .estado {
             text-align: center;
             padding: 2.5rem 1rem;
@@ -201,6 +228,18 @@
             font-size: 0.9rem;
         }
         .estado-error { color: #c53030; }
+
+        .scroll-alertas {
+            max-height: 480px; 
+            overflow-y: auto;  
+            padding-right: 8px;
+        }
+        
+        .scroll-alertas::-webkit-scrollbar { width: 6px; }
+        .scroll-alertas::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .scroll-alertas::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }
+        .scroll-alertas::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
+
     </style>
 </head>
 <body>
@@ -211,59 +250,81 @@
 </header>
 
 <main>
-
-    <!-- Filtros -->
-    <div class="filtros">
-        <div class="campo">
-            <label>Bacteria</label>
-            <select id="sel-bacteria"><option>Cargando…</option></select>
-        </div>
-        <div class="campo">
-            <label>Tipo de muestra</label>
-            <select id="sel-tipo"><option>Cargando…</option></select>
-        </div>
-        <div class="campo">
-            <label>Rango de años</label>
-            <div class="anios-wrap">
-                <input type="number" id="anio-min" placeholder="Desde">
-                <span>–</span>
-                <input type="number" id="anio-max" placeholder="Hasta">
+    <div class="layout-master">
+        
+        <div class="col-principal">
+            
+            <div class="filtros">
+                <div class="campo">
+                    <label>Bacteria</label>
+                    <select id="sel-bacteria"><option>Cargando…</option></select>
+                </div>
+                <div class="campo">
+                    <label>Tipo de muestra</label>
+                    <select id="sel-tipo"><option>Cargando…</option></select>
+                </div>
+                <div class="campo">
+                    <label>Rango de años</label>
+                    <div class="anios-wrap">
+                        <input type="number" id="anio-min" placeholder="Desde">
+                        <span>–</span>
+                        <input type="number" id="anio-max" placeholder="Hasta">
+                    </div>
+                </div>
+                <button id="btn-consultar" onclick="consultar()">Consultar</button>
             </div>
-        </div>
-        <button id="btn-consultar" onclick="consultar()">Consultar</button>
-    </div>
 
-    <!-- Umbral clínico -->
-    <div id="umbral"></div>
+            <div id="umbral"></div>
 
-    <!-- Resultados -->
-    <div class="resultados">
+            <div class="resultados">
+                <div class="card">
+                    <h2>Susceptibilidad %</h2>
+                    <div class="leyenda">
+                        <span><i class="dot dot-verde"></i> Fiabilidad alta (≥30 casos)</span>
+                        <span><i class="dot dot-naranja"></i> Fiabilidad baja</span>
+                    </div>
+                    <div id="grafico-wrap">
+                        <div class="estado">Selecciona los filtros y presiona Consultar.</div>
+                    </div>
+                </div>
 
-        <!-- Gráfico -->
-        <div class="card">
-            <h2>Susceptibilidad %</h2>
-            <div class="leyenda">
-                <span><i class="dot dot-verde"></i> Fiabilidad alta (≥30 casos)</span>
-                <span><i class="dot dot-naranja"></i> Fiabilidad baja</span>
+                <div class="card">
+                    <h2>Tabla de ranking</h2>
+                    <div id="tabla-wrap">
+                        <div class="estado">Selecciona los filtros y presiona Consultar.</div>
+                    </div>
+                </div>
             </div>
-            <div id="grafico-wrap">
-                <div class="estado">Selecciona los filtros y presiona Consultar.</div>
-            </div>
+            
         </div>
-
-        <!-- Tabla -->
-        <div class="card">
-            <h2>Tabla de ranking</h2>
-            <div id="tabla-wrap">
-                <div class="estado">Selecciona los filtros y presiona Consultar.</div>
+        <div class="col-alertas">
+            
+            <div id="contenedor-alertas" style="display: none; background: white; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); padding: 1.25rem; border-top: 5px solid #dc3545;">
+                <h3 style="color: #721c24; margin-top: 0; margin-bottom: 15px; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
+                    <span>⚠️</span> Alertas Activas de Brotes
+                </h3>
+                
+                <div id="lista-alertas-body" class="scroll-alertas"></div>
+                
+                <p style="font-size: 0.75em; color: #718096; margin-bottom: 0; margin-top: 15px; text-align: center; border-top: 1px solid #eee; padding-top: 10px;">
+                    <em>Requiere validación por Infectología.</em>
+                </p>
             </div>
-        </div>
 
-    </div>
+            <div id="contenedor-sin-alertas" style="display: none; background: white; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); padding: 2rem 1.5rem; text-align: center; border-top: 5px solid #27ae60;">
+                <div style="font-size: 2.5rem; margin-bottom: 10px; opacity: 0.9;">✅</div>
+                <h3 style="color: #276749; margin-top: 0; margin-bottom: 8px; font-size: 1.1em;">Sin alertas</h3>
+                <p style="color: #718096; font-size: 0.85em; margin: 0; line-height: 1.4;">
+                    No se detectaron variaciones estadísticas de resistencia para estos filtros.
+                </p>
+            </div>
+
+        </div>
+        </div>
 </main>
 
 <script>
-const API = '';   // vacío = mismo origen (Flask sirve el HTML)
+const API = '';   
 let graficoCurrent = null;
 
 // ── Inicialización ─────────────────────────────────────────────
@@ -312,6 +373,8 @@ async function consultar() {
         mostrarUmbral(data.umbral);
         mostrarTabla(data.ranking);
         mostrarGrafico(data.ranking);
+
+        cargarAlertasEpidemiologicas();
 
     } catch {
         mostrarError('Error de red. ¿Está corriendo el servidor Flask?');
@@ -379,7 +442,6 @@ function mostrarTabla(ranking) {
 function mostrarGrafico(ranking) {
     const wrap = document.getElementById('grafico-wrap');
 
-    // Altura dinámica según cantidad de antibióticos
     const altura = Math.max(300, ranking.length * 28);
     wrap.innerHTML = `<canvas id="grafico" height="${altura}"></canvas>`;
 
@@ -434,6 +496,68 @@ function mostrarGrafico(ranking) {
     });
 }
 
+// ── Alertas Epidemiológicas ────────────────────────────────────
+async function cargarAlertasEpidemiologicas() {
+    try {
+        const bacteria = document.getElementById('sel-bacteria').value;
+        const tipoMuestra = document.getElementById('sel-tipo').value;
+        const anioMax = document.getElementById('anio-max').value;
+
+        const params = new URLSearchParams({ 
+            bacteria: bacteria, 
+            tipo_muestra: tipoMuestra, 
+            anio_max: anioMax 
+        });
+
+        const res = await fetch(`/alertas?${params}`);
+        const datos = await res.json();
+        
+        const contenedorAlertas = document.getElementById('contenedor-alertas');
+        const contenedorSinAlertas = document.getElementById('contenedor-sin-alertas');
+        const listaBody = document.getElementById('lista-alertas-body');
+        
+        listaBody.innerHTML = ''; 
+        
+        if (datos.length > 0) {
+            // Si hay brotes: Se muestra la caja roja y se esconde la verde
+            contenedorAlertas.style.display = 'block';
+            contenedorSinAlertas.style.display = 'none';
+            
+            datos.forEach(alerta => {
+                const ratioTexto = (alerta.pct_Baseline === 0) ? '∞ (Nueva)' : `${alerta.Ratio}x`;
+                const esAlertaCritica = alerta.Nivel === 'Posible Alerta';
+                
+                const colorBorde = esAlertaCritica ? '#dc3545' : '#e67e22'; 
+                const bgBadge = esAlertaCritica ? '#dc3545' : '#fff3cd';
+                const colorTextoBadge = esAlertaCritica ? 'white' : '#856404';
+
+                const tarjeta = `
+                    <div style="border-left: 4px solid ${colorBorde}; background: #f8fafc; padding: 12px; margin-bottom: 10px; border-radius: 0 6px 6px 0; font-size: 0.85em;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
+                            <strong style="color: #2d3748; font-size: 1.05em; line-height: 1.1;">${alerta.bacteria}</strong>
+                            <span style="background: ${bgBadge}; color: ${colorTextoBadge}; padding: 2px 6px; border-radius: 4px; font-size: 0.7em; font-weight: bold; white-space: nowrap; margin-left: 5px;">
+                                ${alerta.Nivel}
+                            </span>
+                        </div>
+                        <div style="color: #4a5568; margin-bottom: 8px;">💊 ${alerta.antibiotico}</div>
+                        <div style="display: flex; justify-content: space-between; color: #718096; font-size: 0.85em; margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 6px;">
+                            <span>${alerta.pct_Baseline}% ➔ <strong style="color: #dc3545;">${alerta.pct_Reciente}%</strong></span>
+                            <span style="font-weight: bold; color: ${colorBorde};">${ratioTexto}</span>
+                        </div>
+                    </div>
+                `;
+                listaBody.innerHTML += tarjeta;
+            });
+        } else {
+            // Si todo está bien: Se esconde la caja roja y se muestra la verde
+            contenedorAlertas.style.display = 'none';
+            contenedorSinAlertas.style.display = 'block';
+        }
+    } catch (err) {
+        console.error("Error obteniendo alertas epidemiológicas:", err);
+    }
+}
+
 // ── Error ──────────────────────────────────────────────────────
 function mostrarError(msg) {
     document.getElementById('tabla-wrap').innerHTML =
@@ -441,6 +565,12 @@ function mostrarError(msg) {
     document.getElementById('grafico-wrap').innerHTML =
         `<div class="estado estado-error"></div>`;
     document.getElementById('umbral').style.display = 'none';
+    
+    const alertasContenedor = document.getElementById('contenedor-alertas');
+    const sinAlertasContenedor = document.getElementById('contenedor-sin-alertas');
+    if (alertasContenedor) alertasContenedor.style.display = 'none';
+    if (sinAlertasContenedor) sinAlertasContenedor.style.display = 'none';
+    
     if (graficoCurrent) { graficoCurrent.destroy(); graficoCurrent = null; }
 }
 
